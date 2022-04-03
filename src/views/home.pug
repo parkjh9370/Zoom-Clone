@@ -10,11 +10,19 @@ html(lang="en")
         header
             h1 Noom
         main
-            form#nick
-                input(type="text", placeholer="choos a nickname", required)
-                button Save 
-            ul
-            form#message
-                input(type="text", placeholer="write a msg", required)
-                button send 
+            div#welcome
+                form
+                    input(placeholder="room name", required, type="text")
+                    button Enter Room
+            div#room
+                h3
+                ul
+                form#name
+                    input(placeholder="Input your nickname", required, type="text")
+                    button Save
+                form#msg
+                    input(placeholder="message name", required, type="text")
+                    button Send
+        //- 서버에서 제공한 socket.IO 임포트(설치)
+        script(src="/socket.io/socket.io.js")
         script(src="/public/js/index.js")

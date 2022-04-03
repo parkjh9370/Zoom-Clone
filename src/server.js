@@ -1,5 +1,5 @@
 import http from "http";
-import { WebSocketServer } from "ws";
+import { Server } from "socket.io";
 import express from "express";
 
 const app = express();
@@ -13,49 +13,61 @@ app.use("/public", express.static(__dirname + "/public"));
 app.get("/", (req, res) => res.render("home"));
 app.get("/*", (req, res) => res.redirect("/"));
  
-const handleListen = () => console.log(`Listening on http://localhost:3000`);
- 
 //http server
-const server = http.createServer(app)
+const httpServer = http.createServer(app);
+// http://localhost:3000/socket.io/socket.io.js
+// url 유저(브라우저)에게 제공, 브라우저에 socket.io 설치 시
+// 해당 Socket.io 임포트 해서 사용가능
+const socketIO = new Server(httpServer);
 
-// Websocket server + http server
-// http 서버에서 websocket 서버를 만들 수 있음
-// http://localhost:3000 + ws//localhost:3000
-// 즉 같은 포트에서 2개의 프로토콜(http, ws) 동작 
-const socket = new WebSocketServer({ server });
-
-const sockets = [];
-
-// 콜백으로 전달되는 (socket) : 연결된 브라우저 메세지 수신
-socket.on("connection", (socket) => {
-    // 연결된 브라우저(크롬, 파이어폭스 등) 배열안에 넣기
-    sockets.push(socket);
-    // 채팅 닉네임 디폴트 설정
+socketIO.on("connection", (socket) => {
     socket["nickname"] = "Anonymous";
-    console.log("Connected to Browser 😀 ");
-    // 브라우저 창 닫혔을 때 실행
-    socket.on("close", () => {
-        console.log("Disconnected from Browser ❌ ")
-        }
-    )
-
-    socket.on("message", msg => {
-        // 연결된 부라우저 모두에게 메세지 보내주기
-        // console.log(message.toString("utf-8"));
-        const message = JSON.parse(msg)
-        // console.log(message)
-        switch (message.type) {
-            case "new_message":
-                sockets.forEach(aSocket => aSocket.send(`${socket.nickname}: ${message.payload}`));
-                break
-            case "nickname":
-                socket["nickname"] = message.payload;
-                break
-        }  
-        // 브라우저에서 받아온 메세지 돌려주기
-        // socket.send(message.toString('utf-8'));
+    // event : 전달받은 event 이름
+    socket.onAny((event) => {
+        console.log(`Socket Event: ${event}`);
+    });
+    // msg: 클라이언트에서 보낸 메세지, done: 클라이언트에서 실행시켜줄 함수
+    socket.on("enter_room", (roomName, done)=> {
+        // 생성된 방의 고유 아이디
+        // console.log(`Room_ID: ${socket.id}`)
+        socket.join(roomName);
+        console.log(roomName)
+        done();
+        // 접속한 방에 '나'를 제외하고 모두에게 메세지 emit
+        socket.to(roomName).emit("welcome", socket.nickname);
+    });
+    // 사용자가 생성된 방을 나갔을 때 해당 이벤트 실행
+    socket.on("disconnecting", () => {
+        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
     })
-    
+    socket.on("new_message", (msg, roomName, done) => {
+        socket.to(roomName).emit("new_message", `${socket.nickname}: ${msg}`);
+        done();
+    })
+    socket.on("nickname", (nickname) => {
+        console.log(nickname)
+        socket["nickname"] = nickname
+    });
 });
 
-server.listen(3000, handleListen);
+const handleListen = () => console.log(`Listening on http://localhost:3000`);
+httpServer.listen(3000, handleListen);
+
+
+
+/*
+socketIO.on("connection", (socket) => {
+    // event : 전달받은 event 이름
+     // roomName: 클라이언트에서 보낸 메세지, done: 클라이언트에서 실행시켜줄 함수
+    socket.on("enter_room", (roomName, done)=> {
+        console.log(socket.id)
+        console.log(socket.rooms)
+        // roomName 으로 socket.rooms에 입장
+        socket.join(roomName);
+        console.log(socket.rooms);
+        setTimeout(() => {
+            done("hello from the backend");
+        }, 1000);
+
+    });
+*/

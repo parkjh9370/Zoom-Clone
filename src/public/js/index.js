@@ -1,63 +1,78 @@
-// socket : 연결된 서버 메세지 수신
-// window.location.host : 현재 브라우저 주소 위치 (localhost:3000)
-const socket = new WebSocket(`ws://${window.location.host}`)
- 
-// socket.addEventListener("open", () => {
-//     console.log("Connected to Server 😀 ");
-// });
+// socket.io 실행 서버 : function io() {}
+const socket = io();
 
-// socket.addEventListener("message", (message) => {
-//     console.log("New Message: ", message.data );
-// })
+const welcome = document.getElementById("welcome");
+const room = document.getElementById("room");
 
-//10 초 후 서버로 해당 메세지 전송
-// setTimeout(() => {
-//     socket.send("hello from the brwoser!");
-// }, 10000)
+room.hidden = true;
 
-// socket.addEventListener("close", () => {
-//     console.log("Disconnected from Server ❌ ");
-// });
+let roomName;
 
-socket.onopen = () => {
-    console.log("Connected to the server 😀 ");
-    };
-
-socket.onmessage = (message) => {
+function addMessage(message) {
+    const ul = room.querySelector("ul");
     const li = document.createElement("li");
-    li.innerText = message.data;
-    messageList.append(li);
+    li.innerText = message;
+    ul.appendChild(li);
+  }
+
+function handleMessageSubmit(event) {
+    event.preventDefault();
+    const input = room.querySelector("#msg input");
+    socket.emit("new_message", input.value, roomName, () => {
+        addMessage(`You: ${input.value}`);
+        input.value = "";
+    });
+}
+
+function handleNicknameSubmit(event) {
+    event.preventDefault();
+    const input = room.querySelector("#name input");
+    socket.emit("nickname", input.value);
+}
+
+// 채팅방 상태 입장
+function showRoom() {
+    welcome.hidden = true;
+    room.hidden = false;
+    const h3 = room.querySelector("h3");
+    h3.innerText = `Room ${roomName}`;
+    const msgForm = room.querySelector("#msg");
+    const nickForm = room.querySelector("#name");
+    msgForm.addEventListener("submit", handleMessageSubmit);
+    nickForm.addEventListener("submit", handleNicknameSubmit);
 };
 
-socket.onclose = () => {
-    console.log(`Disconnected from the server ❌ `);
-};
-
-// --------------------------------------------------
-
-const messageList = document.querySelector("ul");
-const nickForm = document.querySelector("#nick");
-const messageForm = document.querySelector("#message");
-
-function makeMessage(type, payload) {
-    const msg = { type, payload };
-    return JSON.stringify(msg);
-}
-
-function handleNickSubmit(event) {
+// input,value이름으로 채팅방 생성하고, 초기 채팅방 생성 함수 호출
+function handleRoomeSubmit(event) {
     event.preventDefault();
-    const input = nickForm.querySelector("input");
-    socket.send(makeMessage("nickname", input.value));
-    input.value = '';
+    const input = form.querySelector("input");
+    // room 이벤트 emit
+    // 1. Event 이름, 2. 보낼 payload (여러 개도 가능)
+    // 3. 서버에서 호출할 수 있는 function
+    //     -> 서버에서 호출 시 해당 함수를 실행시켜 준다.
+    socket.emit("enter_room",
+        input.value,
+        // server에서 전달받은 인자로 해당 함수를 실행시킨다.
+        showRoom
+    );
+    roomName = input.value;
+    input.value = "";
 }
 
-function handleSubmit(event) {
-    // submit 이벤트 사용 시 새로고침 되는 현상 막아줌
-    event.preventDefault();
-    const input = messageForm.querySelector("input");
-    socket.send(makeMessage("new_message", input.value))
-    input.value = '';
-}
+const form = welcome.querySelector("form");
+form.addEventListener("submit", handleRoomeSubmit);
 
-nickForm.addEventListener("submit", handleNickSubmit)
-messageForm.addEventListener("submit", handleSubmit)
+
+// 사용자가 입장했을 때 '나'를 제외한 모든 사람에게 메세지 
+socket.on("welcome", (user) => {
+    addMessage(`${user} arrived!`)
+    }
+);
+
+socket.on("new_message", (msg) => {
+    addMessage(msg)
+})
+
+socket.on("bye", (user) => {
+    addMessage(`${user} left;`);
+})
