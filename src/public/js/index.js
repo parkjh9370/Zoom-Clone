@@ -24,10 +24,12 @@ function handleMessageSubmit(event) {
     });
 }
 
-function handleNicknameSubmit(event) {
+function changNicknameSubmit(event) {
     event.preventDefault();
     const input = room.querySelector("#name input");
-    socket.emit("nickname", input.value);
+    socket.emit("chang_nick", input.value, () => {
+        input.value = "";
+    });
 }
 
 // 채팅방 상태 입장
@@ -37,26 +39,23 @@ function showRoom() {
     const h3 = room.querySelector("h3");
     h3.innerText = `Room ${roomName}`;
     const msgForm = room.querySelector("#msg");
-    const nickForm = room.querySelector("#name");
+    const changNickform = room.querySelector("#name");
     msgForm.addEventListener("submit", handleMessageSubmit);
-    nickForm.addEventListener("submit", handleNicknameSubmit);
+    changNickform.addEventListener("submit", changNicknameSubmit);
 };
 
 // input,value이름으로 채팅방 생성하고, 초기 채팅방 생성 함수 호출
 function handleRoomeSubmit(event) {
     event.preventDefault();
-    const input = form.querySelector("input");
-    // room 이벤트 emit
-    // 1. Event 이름, 2. 보낼 payload (여러 개도 가능)
-    // 3. 서버에서 호출할 수 있는 function
-    //     -> 서버에서 호출 시 해당 함수를 실행시켜 준다.
+    const roomNameInput = form.querySelector("#roomName");
+    const nickNameInput = form.querySelector("#name");
+   
     socket.emit("enter_room",
-        input.value,
-        // server에서 전달받은 인자로 해당 함수를 실행시킨다.
+        roomNameInput.value, nickNameInput.value,
         showRoom
     );
-    roomName = input.value;
-    input.value = "";
+    roomName = roomNameInput.value;
+    roomNameInput.value = "";
 }
 
 const form = welcome.querySelector("form");

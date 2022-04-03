@@ -27,9 +27,10 @@ socketIO.on("connection", (socket) => {
         console.log(`Socket Event: ${event}`);
     });
     // msg: 클라이언트에서 보낸 메세지, done: 클라이언트에서 실행시켜줄 함수
-    socket.on("enter_room", (roomName, done)=> {
+    socket.on("enter_room", (roomName, nickname, done)=> {
         // 생성된 방의 고유 아이디
         // console.log(`Room_ID: ${socket.id}`)
+        socket["nickname"] = nickname
         socket.join(roomName);
         console.log(roomName)
         done();
@@ -44,10 +45,15 @@ socketIO.on("connection", (socket) => {
         socket.to(roomName).emit("new_message", `${socket.nickname}: ${msg}`);
         done();
     })
-    socket.on("nickname", (nickname) => {
-        console.log(nickname)
+    socket.on("nickname", (nickname, done) => {
+        // console.log(nickname)
         socket["nickname"] = nickname
+        done();
     });
+    socket.on("chang_nick", (nickname, done) => {
+        socket["nickname"] = nickname
+        done();
+    })
 });
 
 const handleListen = () => console.log(`Listening on http://localhost:3000`);
