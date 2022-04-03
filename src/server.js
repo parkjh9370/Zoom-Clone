@@ -1,5 +1,6 @@
 import http from "http";
 import { Server } from "socket.io";
+import { instrument } from "@socket.io/admin-ui";
 import express from "express";
 
 const app = express();
@@ -18,12 +19,40 @@ const httpServer = http.createServer(app);
 // http://localhost:3000/socket.io/socket.io.js
 // url 유저(브라우저)에게 제공, 브라우저에 socket.io 설치 시
 // 해당 Socket.io 임포트 해서 사용가능
-const socketIO = new Server(httpServer);
+const socketIO = new Server(httpServer, {
+    cors: {
+        origin: ["https://admin.socket.io"],
+        credentials: true,
+    }
+});
+instrument(socketIO, {
+    auth: false
+});
+
+function publicRooms() {
+    // rooms: 공개(생성) 방 + 비밀 방, sids: 비밀 방
+    const { rooms, sids } = socketIO.sockets.adapter;
+    const publicRooms = [];
+    rooms.forEach((_, key) => {
+        if (sids.get(key) === undefined) {
+            publicRooms.push(key);
+        }
+    })
+    return publicRooms;
+}
+
+// 방에 접속한 사람 수
+function countRoom(roomName) {
+    // Optional chaining
+    // ex) hi?.size => if(hi) { return hi.size } else { undefined }
+    return socketIO.sockets.adapter.rooms.get(roomName)?.size;
+}
 
 socketIO.on("connection", (socket) => {
     socket["nickname"] = "Anonymous";
     // event : 전달받은 event 이름
     socket.onAny((event) => {
+        // console.log(socketIO.sockets.adapter)
         console.log(`Socket Event: ${event}`);
     });
     // msg: 클라이언트에서 보낸 메세지, done: 클라이언트에서 실행시켜줄 함수
@@ -32,16 +61,25 @@ socketIO.on("connection", (socket) => {
         // console.log(`Room_ID: ${socket.id}`)
         socket["nickname"] = nickname
         socket.join(roomName);
-        console.log(roomName)
-        done();
+        // console.log(roomName)
+        done(countRoom(roomName))
         // 접속한 방에 '나'를 제외하고 모두에게 메세지 emit
-        socket.to(roomName).emit("welcome", socket.nickname);
+        socket.to(roomName).emit("welcome", socket.nickname );
+        // 현재 생성된 방에 대한 정보를 전송 (생성)
+        socketIO.sockets.emit("room_change", publicRooms());
     });
     // 사용자가 생성된 방을 나갔을 때 해당 이벤트 실행
     socket.on("disconnecting", () => {
-        socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
+        socket.rooms.forEach(room =>
+            socket.to(room).emit("bye", socket.nickname, countRoom(room) - 1)
+        )
+    })
+    // 현재 없어진 방에 대한 정보를 전송
+    socket.on("disconnect", () => {
+        socketIO.sockets.emit("room_change", publicRooms());
     })
     socket.on("new_message", (msg, roomName, done) => {
+        // new_message라는 이벤트로 해당 내용 송신
         socket.to(roomName).emit("new_message", `${socket.nickname}: ${msg}`);
         done();
     })
